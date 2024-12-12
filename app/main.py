@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from endpoints import router as endpoints_router
+from webhook import router as webhook_router
 
 app = FastAPI(
     title="Yummy Rides - Corporate Integrations API",
@@ -8,3 +9,4 @@ app = FastAPI(
 )
 
 app.include_router(endpoints_router)
+app.include_router(webhook_router)
