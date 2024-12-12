@@ -35,11 +35,15 @@ class YummyResponse(BaseModel):
 class CreateQuotationRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    destination_latitude: float = Field(..., alias="destinationLatitude")
-    destination_longitude: float = Field(..., alias="destinationLongitude")
-    pickup_latitude: float = Field(..., alias="pickupLatitude")
-    pickup_longitude: float = Field(..., alias="pickupLongitude")
-    weight: float | None = None
+    destination_latitude: float = Field(
+        ..., alias="destinationLatitude", ge=-90, le=90
+    )
+    destination_longitude: float = Field(
+        ..., alias="destinationLongitude", ge=-180, le=180
+    )
+    pickup_latitude: float = Field(..., alias="pickupLatitude", ge=-90, le=90)
+    pickup_longitude: float = Field(..., alias="pickupLongitude", ge=-180, le=180)
+    weight: float | None = Field(None, ge=0)
 
 
 class TripService(BaseModel):
@@ -47,7 +51,7 @@ class TripService(BaseModel):
 
     name: str
     typename: str
-    estimated_fare: float
+    estimated_fare: float = Field(..., ge=0)
     service_type_id: str = Field(..., alias="serviceTypeId")
 
 
@@ -76,8 +80,8 @@ class TripProduct(BaseModel):
 
     name: str
     image: str | None = None
-    price: float | None = None
-    quantity: int
+    price: float | None = Field(None, ge=0)
+    quantity: int = Field(..., gt=0)
     currency_code: Currency | None = Field(None, alias="currencyCode")
 
 
@@ -121,9 +125,9 @@ class CreateTripRequest(BaseModel):
     receiver_phone_number: str
     receiver_picture: str | None = Field(None, alias="receiverPicture")
     trip_source: str | None = Field(None, alias="tripSource")
-    total_order_price: float | None = Field(None, alias="totalOrderPrice")
-    cash_collected: float | None = Field(None, alias="cashCollected")
-    tip_amount: float | None = Field(None, alias="tipAmount")
+    total_order_price: float | None = Field(None, alias="totalOrderPrice", ge=0)
+    cash_collected: float | None = Field(None, alias="cashCollected", ge=0)
+    tip_amount: float | None = Field(None, alias="tipAmount", ge=0)
 
 
 class CreateTripResponseData(BaseModel):
