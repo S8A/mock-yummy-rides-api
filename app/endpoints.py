@@ -5,8 +5,9 @@ import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, ConfigDict
 
-from config import settings
+from db import TripServiceType, init_db
 from dependencies import api_key_header, get_language_header
+from utils import calculate_distance_between_coordinates
 
 router = APIRouter(
     prefix="/api/v1",
@@ -232,6 +233,35 @@ class ErrorResponse(YummyResponse):
 
 @router.post("/quotation/api-corporate", response_model_exclude_unset=True)
 async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationResponse:
+    # Initialize database connection
+    await init_db()
+
+    # Calculate distance between coordinates
+    distance = calculate_distance_between_coordinates(
+        (request.pickup_latitude, request.pickup_longitude),
+        (request.destination_latitude, request.destination_longitude)
+    )
+
+    # Get and filter service types based on weight
+    service_types = await TripServiceType.get_or_create_standard_types()
+
+    # If weight is specified, filter service types
+    if request.weight is not None:
+        service_types = service_types.find(
+            TripServiceType.max_weight >= request.weight
+        )
+
+    # Convert to list and create TripService objects
+    trip_services = [
+        TripService(
+            name=st.name,
+            typename=st.typename,
+            estimated_fare=st.estimate_fare(distance),
+            service_type_id=str(st.id)
+        )
+        for st in await service_types.to_list()
+    ]
+
     return CreateQuotationResponse(
         code="36",
         status=201,
@@ -239,28 +269,9 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
             eta=828,
             message="Cotizacion realizada correctamente",
             success=True,
-            distance=9.25,
+            distance=distance,
             quotation_id=str(uuid.uuid4()).replace("-", ""),
-            trip_services=[
-                TripService(
-                    name="Estandar M",
-                    typename="Mandaditos",
-                    estimated_fare=3,
-                    service_type_id="62bb0f25553aaae8cfba718f",
-                ),
-                TripService(
-                    name="XL",
-                    typename="Mandaditos XL",
-                    estimated_fare=5.72,
-                    service_type_id="62be266b0592bf51f737b9b7",
-                ),
-                TripService(
-                    name="XXL",
-                    typename="Mandaditos XXL",
-                    estimated_fare=9.3,
-                    service_type_id="62be27520592bf51f737b9c6",
-                )
-            ]
+            trip_services=trip_services
         ),
     )
 
