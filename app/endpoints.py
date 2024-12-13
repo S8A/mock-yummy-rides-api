@@ -216,6 +216,7 @@ class ForceTripCompleteResponseData(BaseModel):
 
 
 class ForceTripCompleteResponse(YummyResponse):
+    code: str | None = None
     response: ForceTripCompleteResponseData
 
 
