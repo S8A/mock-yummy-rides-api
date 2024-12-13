@@ -1,4 +1,5 @@
 from enum import Enum
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -6,6 +7,9 @@ from pydantic_settings import BaseSettings
 import httpx
 
 from endpoints import TripStatusCode
+
+LOGGER = logging.getLogger("uvicorn.error")
+
 
 router = APIRouter(
     prefix="/webhook",
@@ -68,30 +72,45 @@ class WebhookCallResponse(BaseModel):
     message: str
 
 
-async def send_webhook(payload: WebhookPayload):
+async def send_webhook(payload: WebhookPayload) -> httpx.Response:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                settings.webhook_url, json=payload.model_dump_json()
+                settings.webhook_url, data=payload.model_dump_json()
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
-            print(e)
+            LOGGER.error(
+                "send_webhook :: Failed to send webhook: %s", str(e), exc_info=True
+            )
             raise HTTPException(
                 status_code=500, detail=f"Failed to send webhook: {str(e)}"
             )
+        LOGGER.info(
+            "send_webhook :: Webhook sent successfully: %s", response.status_code
+        )
+        return response
 
 
 @router.post("/trip/{trip_id}/status")
 async def update_trip_status(
     trip_id: str,
     status_code: TripStatusCode,
-    trip_data: TripData
 ) -> WebhookCallResponse:
     """Send trip status update webhook"""
+    mock_trip_data = TripData(
+        id=trip_id,
+        unique_id=123,
+        code=status_code,
+        sender=Person(
+            first_name="John",
+            last_name="Doe",
+            phone="+584141234567",
+        ),
+    )
     payload = WebhookPayload(
         type=WebhookType.TRIP_UPDATE,
-        data=trip_data
+        data=mock_trip_data
     )
     await send_webhook(payload)
     return WebhookCallResponse(
@@ -103,16 +122,24 @@ async def update_trip_status(
 @router.post("/trip/{trip_id}/cancel")
 async def cancel_trip(
     trip_id: str,
-    trip_data: TripData,
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip cancellation webhook"""
+    mock_trip_data = TripData(
+        id=trip_id,
+        unique_id=123,
+        sender=Person(
+            first_name="John",
+            last_name="Doe",
+            phone="+584141234567",
+        ),
+    )
     webhook_type = WebhookType.TRIP_CANCEL
     if by_admin:
         webhook_type = WebhookType.TRIP_CANCEL_BY_ADMIN
     payload = WebhookPayload(
         type=webhook_type,
-        data=trip_data
+        data=mock_trip_data
     )
     await send_webhook(payload)
     return WebhookCallResponse(
@@ -124,16 +151,25 @@ async def cancel_trip(
 @router.post("/trip/{trip_id}/reassign")
 async def reassign_trip(
     trip_id: str,
-    trip_data: TripData,
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip reassignment webhook"""
+    mock_trip_data = TripData(
+        id=trip_id,
+        unique_id=123,
+        sender=Person(
+            first_name="John",
+            last_name="Doe",
+            phone="+584141234567",
+        ),
+        message="Se está reasignando su viaje",
+    )
     webhook_type = WebhookType.TRIP_REASSIGN
     if by_admin:
         webhook_type = WebhookType.TRIP_REASSIGN_BY_ADMIN
     payload = WebhookPayload(
         type=webhook_type,
-        data=trip_data
+        data=mock_trip_data
     )
     await send_webhook(payload)
     return WebhookCallResponse(
@@ -144,7 +180,7 @@ async def reassign_trip(
 
 @router.post("/test")
 async def test_webhook(payload: WebhookPayload) -> WebhookCallResponse:
-    print(payload)
+    LOGGER.info("test_webhook :: payload = %s", payload.model_dump_json())
     return WebhookCallResponse(
         success=True,
         message="Webhook test successful"
