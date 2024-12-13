@@ -1,19 +1,26 @@
 from enum import Enum
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import httpx
 
-from endpoints import TripStatusCode
 from config import settings
+from dependencies import api_key_header
+from endpoints import TripStatusCode
 
 LOGGER = logging.getLogger("uvicorn.error")
 
 
 router = APIRouter(
     prefix="/webhook",
+    dependencies=[Depends(api_key_header)],
     tags=["webhook"],
+)
+
+test_router = APIRouter(
+    prefix="/webhook-test",
+    tags=["webhook-test"],
 )
 
 
@@ -172,7 +179,7 @@ async def reassign_trip(
     )
 
 
-@router.post("/test")
+@test_router.post("/")
 async def test_webhook(payload: WebhookPayload) -> WebhookCallResponse:
     LOGGER.info(
         "test_webhook :: payload = %s",
