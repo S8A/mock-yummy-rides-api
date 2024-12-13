@@ -241,7 +241,7 @@ class ErrorResponse(YummyResponse):
     response: ErrorResponseData
 
 
-@router.post("/quotation/api-corporate")
+@router.post("/quotation/api-corporate", response_model_exclude_unset=True)
 async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationResponse:
     return CreateQuotationResponse(
         code="36",
@@ -276,7 +276,7 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
     )
 
 
-@router.post("/trip/api-corporate")
+@router.post("/trip/api-corporate", response_model_exclude_unset=True)
 async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
     trip_id = str(uuid.uuid4()).replace("-", "")
     return CreateTripResponse(
@@ -291,7 +291,7 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
     )
 
 
-@router.get("/trip/api-status-by-corporate/{id}")
+@router.get("/trip/api-status-by-corporate/{id}", response_model_exclude_unset=True)
 async def get_trip_status(id: str) -> GetStatusTripResponse:
     return GetStatusTripResponse(
         code="10",
@@ -309,7 +309,7 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
     )
 
 
-@router.post("/trip/external-cancel-trip")
+@router.post("/trip/external-cancel-trip", response_model_exclude_unset=True)
 async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripResponse:
     return CancelTripResponse(
         code="11",
@@ -323,7 +323,7 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
     )
 
 
-@router.post("/payment-trip/pay-payment-b2b")
+@router.post("/payment-trip/pay-payment-b2b", response_model_exclude_unset=True)
 async def force_trip_complete_by_external(
     request: ForceTripCompleteRequest
 ) -> ForceTripCompleteResponse:
