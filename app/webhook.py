@@ -76,7 +76,8 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                settings.webhook_url, data=payload.model_dump_json()
+                settings.webhook_url,
+                data=payload.model_dump_json(exclude_unset=True),
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
@@ -180,7 +181,10 @@ async def reassign_trip(
 
 @router.post("/test")
 async def test_webhook(payload: WebhookPayload) -> WebhookCallResponse:
-    LOGGER.info("test_webhook :: payload = %s", payload.model_dump_json())
+    LOGGER.info(
+        "test_webhook :: payload = %s",
+        payload.model_dump_json(exclude_unset=True),
+    )
     return WebhookCallResponse(
         success=True,
         message="Webhook test successful"
