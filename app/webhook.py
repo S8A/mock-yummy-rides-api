@@ -3,10 +3,10 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings
 import httpx
 
 from endpoints import TripStatusCode
+from config import settings
 
 LOGGER = logging.getLogger("uvicorn.error")
 
@@ -15,13 +15,6 @@ router = APIRouter(
     prefix="/webhook",
     tags=["webhook"],
 )
-
-
-class Settings(BaseSettings):
-    webhook_url: str
-
-
-settings = Settings()
 
 
 class WebhookType(Enum):
@@ -76,7 +69,7 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
-                settings.webhook_url,
+                settings.WEBHOOK_URL,
                 data=payload.model_dump_json(exclude_unset=True),
             )
             response.raise_for_status()
