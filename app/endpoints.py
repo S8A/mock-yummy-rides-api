@@ -2,12 +2,23 @@ from enum import Enum, IntEnum
 from typing import List
 import uuid
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field, ConfigDict
 
-API_KEY_NAME = "Api-Key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
+from config import settings
+
+
+class CustomAPIKeyHeader(APIKeyHeader):
+
+    async def __call__(self, request: Request) -> str | None:
+        api_key = await super().__call__(request)
+        if api_key != settings.API_KEY:
+            raise HTTPException(status_code=403, detail="Invalid API key")
+        return api_key
+
+
+api_key_header = CustomAPIKeyHeader(name="Api-Key", auto_error=True)
 
 
 class Language(Enum):
