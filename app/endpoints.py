@@ -1,11 +1,23 @@
 from enum import Enum, IntEnum
 from typing import List
-import uuid
+import random
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
+from beanie import PydanticObjectId
 
-from db import TripService, TripServiceType, Quotation, init_db
+from db import (
+    Contact,
+    Currency,
+    PaymentMode,
+    Quotation,
+    Trip,
+    TripProduct,
+    TripService,
+    TripServiceType,
+    TripStatusCode,
+    init_db,
+)
 from dependencies import api_key_header, get_language_header
 from utils import calculate_distance_between_coordinates
 
@@ -58,19 +70,12 @@ class CreateQuotationResponse(YummyResponse):
     response: CreateQuotationResponseData
 
 
-class Currency(Enum):
-    BS = "BS"
-    USD = "USD"
-
-
-class TripProduct(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class TripProductData(BaseModel):
     name: str
     image: str | None = None
     price: float | None = Field(None, ge=0)
     quantity: int = Field(..., gt=0)
-    currency_code: Currency | None = Field(None, alias="currencyCode")
+    currency_code: Currency | None = None
 
 
 class StoreDetail(BaseModel):
@@ -85,12 +90,6 @@ class StoreDetail(BaseModel):
     store_country_phone_code: str | None = Field(None, alias="storeCountryPhoneCode")
 
 
-class PaymentMode(IntEnum):
-    CASH = 1
-    POS = 4
-    DEFAULT = 7
-
-
 class CreateTripRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -98,7 +97,7 @@ class CreateTripRequest(BaseModel):
     payment_mode: PaymentMode = Field(..., alias="paymentMode")
     quotation_id: str = Field(..., alias="quotationId")
     store_detail: StoreDetail | None = Field(None, alias="storeDetail")
-    trip_products: List[TripProduct] | None = Field(None, alias="tripProducts")
+    trip_products: List[TripProductData] | None = Field(None, alias="tripProducts")
     service_type_id: str = Field(..., alias="serviceTypeId")
     source_address: str = Field(..., alias="sourceAddress")
     destination_address: str = Field(..., alias="destinationAddress")
@@ -127,16 +126,6 @@ class CreateTripResponseData(BaseModel):
 
 class CreateTripResponse(YummyResponse):
     response: CreateTripResponseData
-
-
-class TripStatusCode(IntEnum):
-    CANCELLED = 0
-    ACCEPTED = 1
-    DRIVER_ON_THE_WAY = 2
-    DRIVER_ARRIVED_TO_PICKUP = 4
-    DRIVER_ON_THE_WAY_TO_DESTINATION = 6
-    DRIVER_ARRIVED_TO_DESTINATION = 8
-    TRIP_COMPLETED = 9
 
 
 class TripStatusText(Enum):
@@ -229,6 +218,10 @@ class ErrorResponse(YummyResponse):
     response: ErrorResponseData
 
 
+DRIVER_FIRST_NAMES = ["Jose", "Juan", "Manuel", "Pedro"]
+DRIVER_LAST_NAMES = ["Garcia", "Hernandez", "Lopez", "Perez"]
+
+
 @router.post("/quotation/api-corporate", response_model_exclude_unset=True)
 async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationResponse:
     # Initialize database connection
@@ -300,15 +293,108 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
 
 @router.post("/trip/api-corporate", response_model_exclude_unset=True)
 async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
-    trip_id = str(uuid.uuid4()).replace("-", "")
+    # Initialize database connection
+    await init_db()
+
+    # Validate quotation exists
+    quotation = await Quotation.get(PydanticObjectId(request.quotation_id))
+    if not quotation:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Quotation {request.quotation_id} not found"
+        )
+
+    # Validate service type exists
+    service_type = await TripServiceType.get(PydanticObjectId(request.service_type_id))
+    if not service_type:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Service type {request.service_type_id} not found"
+        )
+
+    # Validate cash_collected is only set for cash payments
+    cash_collected = request.cash_collected
+    if request.payment_mode != PaymentMode.CASH:
+        cash_collected = None
+
+    # Create sender Contact from store details or user details
+    sender = Contact(
+        first_name=request.user_first_name or "",
+        last_name=request.user_last_name or "",
+        phone_country_code=request.user_country_phone_code,
+        phone_number=request.user_phone_number,
+    )
+
+    if request.store_detail:
+        sender.is_store = True
+        sender.store_full_name = request.store_detail.store_full_name
+        sender.store_alias = request.store_detail.store_alias_name
+        sender.store_image = request.store_detail.store_image
+        sender.store_favicon = request.store_detail.store_fav_icon
+
+    # Create receiver Contact
+    receiver = Contact(
+        first_name=request.receiver_first_name,
+        last_name=request.receiver_last_name,
+        phone_country_code=request.receiver_country_phone_code,
+        phone_number=request.receiver_phone_number,
+    )
+
+    # Create driver Contact with random name
+    driver = Contact(
+        first_name=random.choice(DRIVER_FIRST_NAMES),
+        last_name=random.choice(DRIVER_LAST_NAMES),
+        phone_country_code="+58",
+        phone_number="4241234567",
+    )
+
+    # Create trip products if provided
+    trip_products = None
+    if request.trip_products:
+        trip_products = [
+            TripProduct(
+                name=product.name,
+                image=product.image,
+                price=product.price,
+                quantity=product.quantity,
+                currency_code=product.currency_code,
+            )
+            for product in request.trip_products
+        ]
+
+    # Create and save the Trip
+    trip = Trip(
+        status=TripStatusCode.ACCEPTED,
+        payer_id=request.payer_id,
+        payment_mode=request.payment_mode,
+        quotation_id=str(quotation.id),
+        service_type_id=str(service_type.id),
+        order_id=request.partner_order_id,
+        source_address=request.source_address,
+        destination_address=request.destination_address,
+        sender=sender,
+        receiver=receiver,
+        driver=driver,
+        trip_source=request.trip_source,
+        trip_products=trip_products,
+        total_order_price=request.total_order_price,
+        cash_collected=cash_collected,
+        tip_amount=request.tip_amount,
+    )
+    await trip.insert()
+
+    # Generate a deterministic unique_id using the trip's ID as seed
+    random.seed(str(trip.id))
+    unique_id = random.randint(10000, 99999)
+
     return CreateTripResponse(
         code="9",
         status=201,
         response=CreateTripResponseData(
             message="Viaje creado correctamente",
             success=True,
-            trip_id=trip_id,
-            trip_unique_id=29714
+            trip_id=str(trip.id),
+            trip_unique_id=unique_id
         ),
     )
 
