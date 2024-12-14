@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, ConfigDict
 
-from db import TripServiceType, init_db
+from db import TripService, TripServiceType, Quotation, init_db
 from dependencies import api_key_header, get_language_header
 from utils import calculate_distance_between_coordinates
 
@@ -36,13 +36,11 @@ class CreateQuotationRequest(BaseModel):
     weight: float | None = Field(None, ge=0)
 
 
-class TripService(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class TripServiceData(BaseModel):
     name: str
     typename: str
     estimated_fare: float = Field(..., ge=0)
-    service_type_id: str = Field(..., alias="serviceTypeId")
+    service_type_id: str
 
 
 class CreateQuotationResponseData(BaseModel):
@@ -53,7 +51,7 @@ class CreateQuotationResponseData(BaseModel):
     success: bool
     distance: float
     quotation_id: str = Field(..., alias="quotationId")
-    trip_services: List[TripService]
+    trip_services: List[TripServiceData]
 
 
 class CreateQuotationResponse(YummyResponse):
@@ -256,7 +254,7 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
             TripServiceType.max_weight >= request.weight
         )
 
-    # Convert to list and create TripService objects
+    # Create TripService documents
     trip_services = [
         TripService(
             name=st.name,
@@ -267,6 +265,25 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
         for st in await service_types.to_list()
     ]
 
+    # Create and save the Quotation document
+    quotation = Quotation(
+        eta=eta,
+        distance=distance,
+        trip_services=trip_services,
+    )
+    await quotation.insert()
+
+    # Convert TripService documents to response models
+    trip_services_data = [
+        TripServiceData(
+            name=ts.name,
+            typename=ts.typename,
+            estimated_fare=ts.estimated_fare,
+            service_type_id=str(ts.service_type_id)
+        )
+        for ts in trip_services
+    ]
+
     return CreateQuotationResponse(
         code="36",
         status=201,
@@ -275,8 +292,8 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
             message="Cotizacion realizada correctamente",
             success=True,
             distance=distance,
-            quotation_id=str(uuid.uuid4()).replace("-", ""),
-            trip_services=trip_services
+            quotation_id=str(quotation.id),
+            trip_services=trip_services_data,
         ),
     )
 

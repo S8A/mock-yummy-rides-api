@@ -15,7 +15,7 @@ async def init_db():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
     await init_beanie(
         database=client[settings.MONGODB_DB_NAME],
-        document_models=[TripServiceType]
+        document_models=[TripService, TripServiceType, Quotation],
     )
 
 
@@ -70,3 +70,16 @@ class TripServiceType(Document):
     def estimate_fare(self, distance: float) -> float:
         """Estimate fare based on distance (km) and service type's max weight."""
         return round(distance * sqrt(self.max_weight) * 0.10, 2)
+
+
+class TripService(Document):
+    name: str
+    typename: str
+    estimated_fare: float = Field(ge=0)
+    service_type_id: str
+
+
+class Quotation(Document):
+    eta: int = Field(ge=0)
+    distance: float = Field(ge=0)
+    trip_services: List[TripService]
