@@ -401,6 +401,21 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
 
 @router.get("/trip/api-status-by-corporate/{id}", response_model_exclude_unset=True)
 async def get_trip_status(id: str) -> GetStatusTripResponse:
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {id} not found"
+        )
+
+    # Generate deterministic unique_id using the trip's ID
+    random.seed(str(trip.id))
+    unique_id = random.randint(10000, 99999)
+
     return GetStatusTripResponse(
         code="10",
         status=200,
@@ -408,10 +423,10 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
             message="Status del viaje obtenido con éxito",
             success=True,
             trip=TripStatusData(
-                id=id,
-                unique_id=656,
-                status_code=TripStatusCode.DRIVER_ON_THE_WAY,
-                status_text=TripStatusText.DRIVER_ON_THE_WAY,
+                id=str(trip.id),
+                unique_id=unique_id,
+                status_code=trip.status,
+                status_text=trip.get_status_text().value
             )
         ),
     )

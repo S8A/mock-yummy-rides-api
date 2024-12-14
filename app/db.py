@@ -32,6 +32,16 @@ class TripStatusCode(IntEnum):
     TRIP_COMPLETED = 9
 
 
+class TripStatusText(Enum):
+    CANCELLED = "Cancelado"
+    ACCEPTED = "Aceptado"
+    DRIVER_ON_THE_WAY = "En camino"
+    DRIVER_ARRIVED_TO_PICKUP = "Primera parada"
+    DRIVER_ON_THE_WAY_TO_DESTINATION = "En camino a destino"
+    DRIVER_ARRIVED_TO_DESTINATION = "Llegó a destino"
+    TRIP_COMPLETED = "Completado"
+
+
 async def init_db():
     """Initialize database connection and models"""
     client = AsyncIOMotorClient(settings.MONGODB_URL)
@@ -151,3 +161,7 @@ class Trip(Document):
     total_order_price: float | None = Field(None, ge=0)
     cash_collected: float | None = Field(None, ge=0)
     tip_amount: float | None = Field(None, ge=0)
+
+    def get_status_text(self) -> TripStatusText:
+        """Get the text representation of the trip's status."""
+        return TripStatusText[TripStatusCode(self.status).name]
