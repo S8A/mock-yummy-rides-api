@@ -242,6 +242,11 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
         (request.destination_latitude, request.destination_longitude)
     )
 
+    # Calculate the ETA in seconds based on the distance and assuming 60 km/h
+    # 60 km/h = 1 km/min = 1/60 km/s
+    # eta = distance / (1/60)
+    eta = int(distance * 60)
+
     # Get and filter service types based on weight
     service_types = await TripServiceType.get_or_create_standard_types()
 
@@ -266,7 +271,7 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
         code="36",
         status=201,
         response=CreateQuotationResponseData(
-            eta=828,
+            eta=eta,
             message="Cotizacion realizada correctamente",
             success=True,
             distance=distance,
