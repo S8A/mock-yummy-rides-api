@@ -19,7 +19,7 @@ from db import (
     init_db,
 )
 from dependencies import api_key_header, get_language_header
-from utils import calculate_distance_between_coordinates
+from utils import calculate_distance_between_coordinates, generate_driver_data
 
 router = APIRouter(
     prefix="/api/v1",
@@ -218,10 +218,6 @@ class ErrorResponse(YummyResponse):
     response: ErrorResponseData
 
 
-DRIVER_FIRST_NAMES = ["Jose", "Juan", "Manuel", "Pedro"]
-DRIVER_LAST_NAMES = ["Garcia", "Hernandez", "Lopez", "Perez"]
-
-
 @router.post("/quotation/api-corporate", response_model_exclude_unset=True)
 async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationResponse:
     # Initialize database connection
@@ -341,11 +337,17 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
     )
 
     # Create driver Contact with random name
+    (
+        driver_first_name,
+        driver_last_name,
+        driver_phone_country_code,
+        driver_phone_number
+    ) = generate_driver_data()
     driver = Contact(
-        first_name=random.choice(DRIVER_FIRST_NAMES),
-        last_name=random.choice(DRIVER_LAST_NAMES),
-        phone_country_code="+58",
-        phone_number="4241234567",
+        first_name=driver_first_name,
+        last_name=driver_last_name,
+        phone_country_code=driver_phone_country_code,
+        phone_number=driver_phone_number,
     )
 
     # Create trip products if provided
