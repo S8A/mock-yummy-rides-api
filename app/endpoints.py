@@ -354,6 +354,22 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             req_body=request.model_dump(by_alias=True),
         )
 
+    # Check if quotation is already in use by an active trip
+    existing_trip = await Trip.find_one(
+        Trip.quotation_id == str(quotation.id),
+        Trip.status != TripStatusCode.CANCELLED,
+    )
+
+    if existing_trip:
+        raise YummyHTTPException(
+            status_code=400,
+            name="ValidationError",
+            path="/api/v1/trip/api-corporate",
+            method="POST",
+            message="Quotation already used to create a trip",
+            req_body=request.model_dump(by_alias=True),
+        )
+
     # Try to get service type
     service_type = None
     try:
@@ -370,6 +386,19 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             path="/api/v1/trip/api-corporate",
             method="POST",
             message="Service type not found",
+            req_body=request.model_dump(by_alias=True),
+        )
+
+    # Validate service type exists in quotation
+    if not any(
+        ts.service_type_id == str(service_type.id) for ts in quotation.trip_services
+    ):
+        raise YummyHTTPException(
+            status_code=400,
+            name="ValidationError",
+            path="/api/v1/trip/api-corporate",
+            method="POST",
+            message="Service type not available for this quotation",
             req_body=request.model_dump(by_alias=True),
         )
 
