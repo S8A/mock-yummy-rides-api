@@ -1,8 +1,10 @@
-from enum import Enum, IntEnum
+from datetime import datetime, timezone
+from enum import Enum
 from typing import List
 import random
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -214,9 +216,58 @@ class ErrorResponseData(BaseModel):
 
 
 class ErrorResponse(YummyResponse):
+    code: str | None = None
     error_code: str
     status: int
     response: ErrorResponseData
+
+
+class YummyHTTPException(HTTPException):
+    """Custom exception for Yummy-style error responses"""
+
+    def __init__(
+        self,
+        status_code: int,
+        name: str,
+        path: str,
+        method: str,
+        message: str,
+        req_body: dict | None = None,
+        error_description: list[str] | None = None,
+    ):
+        super().__init__(status_code=status_code)
+        self.name = name
+        self.path = path
+        self.method = method
+        self.message = message
+        self.req_body = req_body or {}
+        self.error_description = error_description or [message]
+
+
+async def yummy_exception_handler(
+    request: Request,
+    exc: YummyHTTPException
+) -> JSONResponse:
+    """Handle YummyHTTPException by returning a formatted error response"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            error_code=str(exc.status_code),
+            status=exc.status_code,
+            response=ErrorResponseData(
+                name=exc.name,
+                path=exc.path,
+                type="error",
+                stack="",
+                method=exc.method,
+                message=exc.message,
+                req_body=exc.req_body,
+                success=False,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                error_description=exc.error_description,
+            ),
+        ).model_dump(exclude_unset=True),
+    )
 
 
 @router.post("/quotation/api-corporate", response_model_exclude_unset=True)
@@ -303,7 +354,14 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
         quotation = await Quotation.get(quotation_id)
 
     if not quotation:
-        raise HTTPException(status_code=404, detail="Quotation not found")
+        raise YummyHTTPException(
+            status_code=404,
+            name="NotFoundError",
+            path="/api/v1/trip/api-corporate",
+            method="POST",
+            message="Quotation not found",
+            req_body=request.model_dump(by_alias=True),
+        )
 
     # Try to get service type
     service_type = None
@@ -315,7 +373,14 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
         service_type = await TripServiceType.get(service_type_id)
 
     if not service_type:
-        raise HTTPException(status_code=404, detail="Service type not found")
+        raise YummyHTTPException(
+            status_code=404,
+            name="NotFoundError",
+            path="/api/v1/trip/api-corporate",
+            method="POST",
+            message="Service type not found",
+            req_body=request.model_dump(by_alias=True),
+        )
 
     # Validate cash_collected is only set for cash payments
     cash_collected = request.cash_collected
@@ -425,7 +490,13 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
         trip = await Trip.get(trip_id)
 
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise YummyHTTPException(
+            status_code=404,
+            name="NotFoundError",
+            path=f"/api/v1/trip/api-status-by-corporate/{id}",
+            method="GET",
+            message="Trip not found",
+        )
 
     # Generate deterministic unique_id using the trip's ID
     random.seed(str(trip.id))
@@ -462,7 +533,14 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
         trip = await Trip.get(trip_id)
 
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise YummyHTTPException(
+            status_code=404,
+            name="NotFoundError",
+            path="/api/v1/trip/external-cancel-trip",
+            method="POST",
+            message="Trip not found",
+            req_body=request.model_dump(by_alias=True),
+        )
 
     # Update trip status to cancelled
     trip.status = TripStatusCode.CANCELLED
@@ -497,7 +575,14 @@ async def force_trip_complete_by_external(
         trip = await Trip.get(trip_id)
 
     if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+        raise YummyHTTPException(
+            status_code=404,
+            name="NotFoundError",
+            path="/api/v1/payment-trip/pay-payment-b2b",
+            method="POST",
+            message="Trip not found",
+            req_body=request.model_dump(by_alias=True),
+        )
 
     # Update trip status to completed
     trip.status = TripStatusCode.TRIP_COMPLETED
