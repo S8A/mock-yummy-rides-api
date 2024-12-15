@@ -95,6 +95,7 @@ class WebhookPayload(BaseModel):
 class WebhookCallResponse(BaseModel):
     success: bool
     message: str
+    payload: WebhookPayload
 
 
 async def send_webhook(payload: WebhookPayload) -> httpx.Response:
@@ -178,7 +179,8 @@ async def update_trip_status(
 
     return WebhookCallResponse(
         success=True,
-        message="Webhook sent successfully"
+        message="Webhook sent successfully",
+        payload=payload,
     )
 
 
@@ -244,7 +246,8 @@ async def cancel_trip(
 
     return WebhookCallResponse(
         success=True,
-        message="Webhook sent successfully"
+        message="Webhook sent successfully",
+        payload=payload,
     )
 
 
@@ -318,7 +321,8 @@ async def reassign_trip(
 
     return WebhookCallResponse(
         success=True,
-        message="Webhook sent successfully"
+        message="Webhook sent successfully",
+        payload=payload,
     )
 
 
@@ -330,5 +334,6 @@ async def test_webhook(payload: WebhookPayload) -> WebhookCallResponse:
     )
     return WebhookCallResponse(
         success=True,
-        message="Webhook test successful"
+        message="Webhook test successful",
+        payload=payload,
     )
