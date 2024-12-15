@@ -562,6 +562,21 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
             req_body=request.model_dump(by_alias=True),
         )
 
+    # Check if trip can be cancelled
+    if trip.status in [
+        TripStatusCode.CANCELLED,
+        TripStatusCode.TRIP_COMPLETED,
+        TripStatusCode.DRIVER_ARRIVED_TO_DESTINATION,
+    ]:
+        raise YummyHTTPException(
+            status_code=400,
+            name="ValidationError",
+            path="/api/v1/trip/external-cancel-trip",
+            method="POST",
+            message="Trip cannot be cancelled in its current state",
+            req_body=request.model_dump(by_alias=True),
+        )
+
     # Update trip status to cancelled
     trip.status = TripStatusCode.CANCELLED
     await trip.save()
