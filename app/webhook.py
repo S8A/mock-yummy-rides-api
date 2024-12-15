@@ -182,23 +182,56 @@ async def cancel_trip(
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip cancellation webhook"""
-    mock_trip_data = TripData(
-        id=trip_id,
-        unique_id=123,
-        sender=Person(
-            first_name="John",
-            last_name="Doe",
-            phone="+584141234567",
-        ),
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(trip_id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {trip_id} not found"
+        )
+
+    # Update trip status to cancelled
+    trip.status = TripStatusCode.CANCELLED
+    await trip.save()
+
+    # Generate deterministic unique_id using the trip's ID
+    random.seed(str(trip.id))
+    unique_id = random.randint(10000, 99999)
+
+    # Convert Contact objects to Person objects
+    sender = Person.from_contact(trip.sender)
+
+    receiver = None
+    if trip.receiver:
+        receiver = Person.from_contact(trip.receiver)
+
+    driver = None
+    if trip.driver:
+        driver = Driver.from_contact(str(trip.id), unique_id, trip.driver)
+
+    # Create TripData from actual trip
+    trip_data = TripData(
+        id=str(trip.id),
+        unique_id=unique_id,
+        order_id=trip.order_id,
+        sender=sender,
+        receiver=receiver,
+        driver=driver,
     )
+
+    # Build and send payload to webhook
     webhook_type = WebhookType.TRIP_CANCEL
     if by_admin:
         webhook_type = WebhookType.TRIP_CANCEL_BY_ADMIN
     payload = WebhookPayload(
         type=webhook_type,
-        data=mock_trip_data
+        data=trip_data,
     )
     await send_webhook(payload)
+
     return WebhookCallResponse(
         success=True,
         message="Webhook sent successfully"
