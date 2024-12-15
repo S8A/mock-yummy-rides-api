@@ -1,0 +1,2 @@
+API_KEY=replace_with_your_api_key
+WEBHOOK_URL=http://localhost:8000/webhook-test/
