@@ -630,6 +630,17 @@ async def force_trip_complete_by_external(
             req_body=request.model_dump(by_alias=True),
         )
 
+    # Check that forceB2B is true
+    if not request.force_b2b:
+        raise YummyHTTPException(
+            status_code=400,
+            name="ValidationError",
+            path="/api/v1/payment-trip/pay-payment-b2b",
+            method="POST",
+            message="forceB2B must be true to force trip completion",
+            req_body=request.model_dump(by_alias=True),
+        )
+
     # Update trip status to completed
     trip.status = TripStatusCode.TRIP_COMPLETED
     await trip.save()
