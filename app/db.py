@@ -11,7 +11,7 @@ from pydantic import Field
 from config import settings
 
 
-class Currency(Enum):
+class Currency(str, Enum):
     BS = "BS"
     USD = "USD"
 
@@ -32,7 +32,7 @@ class TripStatusCode(IntEnum):
     TRIP_COMPLETED = 9
 
 
-class TripStatusText(Enum):
+class TripStatusText(str, Enum):
     CANCELLED = "Cancelado"
     ACCEPTED = "Aceptado"
     DRIVER_ON_THE_WAY = "En camino"

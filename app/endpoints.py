@@ -19,6 +19,7 @@ from db import (
     TripService,
     TripServiceType,
     TripStatusCode,
+    TripStatusText,
     init_db,
 )
 from dependencies import api_key_header, get_language_header
@@ -129,16 +130,6 @@ class CreateTripResponseData(BaseModel):
 
 class CreateTripResponse(YummyResponse):
     response: CreateTripResponseData
-
-
-class TripStatusText(Enum):
-    CANCELLED = "Cancelado"
-    ACCEPTED = "Aceptado"
-    DRIVER_ON_THE_WAY = "En camino"
-    DRIVER_ARRIVED_TO_PICKUP = "Primera parada"
-    DRIVER_ON_THE_WAY_TO_DESTINATION = "En camino a destino"
-    DRIVER_ARRIVED_TO_DESTINATION = "Llegó a destino"
-    TRIP_COMPLETED = "Completado"
 
 
 class TripStatusData(BaseModel):

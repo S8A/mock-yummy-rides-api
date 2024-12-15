@@ -29,7 +29,7 @@ test_router = APIRouter(
 )
 
 
-class WebhookType(Enum):
+class WebhookType(str, Enum):
     TRIP_UPDATE = "trip_update"
     TRIP_CANCEL = "trip_cancel"
     TRIP_CANCEL_BY_ADMIN = "trip_cancel_by_admin"
