@@ -119,7 +119,7 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
         return response
 
 
-@router.post("/trip/{id}/status", response_model_exclude_unset=True)
+@router.post("/trip/{id}/status/{status_code}", response_model_exclude_unset=True)
 async def update_trip_status(
     id: str,
     status_code: TripStatusCode,
