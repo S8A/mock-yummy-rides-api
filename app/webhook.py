@@ -11,6 +11,7 @@ from config import settings
 from db import Contact, Trip, init_db
 from dependencies import api_key_header
 from endpoints import TripStatusCode
+from utils import generate_driver_data
 
 LOGGER = logging.getLogger("uvicorn.error")
 
@@ -244,24 +245,64 @@ async def reassign_trip(
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip reassignment webhook"""
-    mock_trip_data = TripData(
-        id=trip_id,
-        unique_id=123,
-        sender=Person(
-            first_name="John",
-            last_name="Doe",
-            phone="+584141234567",
-        ),
-        message="Se está reasignando su viaje",
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(trip_id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {trip_id} not found"
+        )
+
+    # Generate and assign new driver
+    (
+        driver_first_name,
+        driver_last_name,
+        driver_phone_country_code,
+        driver_phone_number
+    ) = generate_driver_data()
+    trip.driver = Contact(
+        first_name=driver_first_name,
+        last_name=driver_last_name,
+        phone_country_code=driver_phone_country_code,
+        phone_number=driver_phone_number,
     )
+    await trip.save()
+
+    # Generate deterministic unique_id using the trip's ID
+    random.seed(str(trip.id))
+    unique_id = random.randint(10000, 99999)
+
+    # Convert Contact objects to Person objects
+    sender = Person.from_contact(trip.sender)
+
+    receiver = None
+    if trip.receiver:
+        receiver = Person.from_contact(trip.receiver)
+
+    # Create TripData from actual trip (excluding driver)
+    trip_data = TripData(
+        id=str(trip.id),
+        unique_id=unique_id,
+        order_id=trip.order_id,
+        sender=sender,
+        receiver=receiver,
+        message="Se está reasignando su viaje",
+        reassignment_by_admin=by_admin,
+    )
+
+    # Build and send payload to webhook
     webhook_type = WebhookType.TRIP_REASSIGN
     if by_admin:
         webhook_type = WebhookType.TRIP_REASSIGN_BY_ADMIN
     payload = WebhookPayload(
         type=webhook_type,
-        data=mock_trip_data
+        data=trip_data,
     )
     await send_webhook(payload)
+
     return WebhookCallResponse(
         success=True,
         message="Webhook sent successfully"
