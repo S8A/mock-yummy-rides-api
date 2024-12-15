@@ -103,7 +103,7 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
         try:
             response = await client.post(
                 settings.WEBHOOK_URL,
-                data=payload.model_dump_json(exclude_unset=True),
+                json=payload.model_dump(exclude_unset=True),
             )
             response.raise_for_status()
         except httpx.HTTPError as e:
