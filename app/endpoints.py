@@ -434,11 +434,26 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
 
 @router.post("/trip/external-cancel-trip", response_model_exclude_unset=True)
 async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripResponse:
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(request.trip_id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {request.trip_id} not found"
+        )
+
+    # Update trip status to cancelled
+    trip.status = TripStatusCode.CANCELLED
+    await trip.save()
+
     return CancelTripResponse(
         code="11",
         status=200,
         response=CancelTripResponseData(
-            payment_method=1,
+            payment_method=trip.payment_mode,
             payment_status=1,
             message="Tu viaje ha sido cancelado exitosamente",
             success=True
