@@ -4,8 +4,9 @@ import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-import httpx
 from beanie import PydanticObjectId
+from bson.errors import InvalidId
+import httpx
 
 from config import settings
 from db import Contact, Trip, init_db
@@ -117,9 +118,9 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
         return response
 
 
-@router.post("/trip/{trip_id}/status", response_model_exclude_unset=True)
+@router.post("/trip/{id}/status", response_model_exclude_unset=True)
 async def update_trip_status(
-    trip_id: str,
+    id: str,
     status_code: TripStatusCode,
 ) -> WebhookCallResponse:
     """Send trip status update webhook"""
@@ -127,12 +128,16 @@ async def update_trip_status(
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(trip_id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {trip_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Update trip status
     trip.status = status_code
@@ -177,9 +182,9 @@ async def update_trip_status(
     )
 
 
-@router.post("/trip/{trip_id}/cancel")
+@router.post("/trip/{id}/cancel")
 async def cancel_trip(
-    trip_id: str,
+    id: str,
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip cancellation webhook"""
@@ -187,12 +192,16 @@ async def cancel_trip(
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(trip_id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {trip_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Update trip status to cancelled
     trip.status = TripStatusCode.CANCELLED
@@ -239,9 +248,9 @@ async def cancel_trip(
     )
 
 
-@router.post("/trip/{trip_id}/reassign")
+@router.post("/trip/{id}/reassign")
 async def reassign_trip(
-    trip_id: str,
+    id: str,
     by_admin: bool = False
 ) -> WebhookCallResponse:
     """Send trip reassignment webhook"""
@@ -249,12 +258,16 @@ async def reassign_trip(
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(trip_id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {trip_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Generate and assign new driver
     (

@@ -5,6 +5,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
 from beanie import PydanticObjectId
+from bson.errors import InvalidId
 
 from db import (
     Contact,
@@ -292,21 +293,29 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
     # Initialize database connection
     await init_db()
 
-    # Validate quotation exists
-    quotation = await Quotation.get(PydanticObjectId(request.quotation_id))
-    if not quotation:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Quotation {request.quotation_id} not found"
-        )
+    # Try to get quotation
+    quotation = None
+    try:
+        quotation_id = PydanticObjectId(request.quotation_id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        quotation = await Quotation.get(quotation_id)
 
-    # Validate service type exists
-    service_type = await TripServiceType.get(PydanticObjectId(request.service_type_id))
+    if not quotation:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    # Try to get service type
+    service_type = None
+    try:
+        service_type_id = PydanticObjectId(request.service_type_id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        service_type = await TripServiceType.get(service_type_id)
+
     if not service_type:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Service type {request.service_type_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Service type not found")
 
     # Validate cash_collected is only set for cash payments
     cash_collected = request.cash_collected
@@ -407,12 +416,16 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Generate deterministic unique_id using the trip's ID
     random.seed(str(trip.id))
@@ -440,12 +453,16 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(request.trip_id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(request.trip_id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {request.trip_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Update trip status to cancelled
     trip.status = TripStatusCode.CANCELLED
@@ -471,12 +488,16 @@ async def force_trip_complete_by_external(
     await init_db()
 
     # Try to get the trip
-    trip = await Trip.get(PydanticObjectId(request.trip_id))
+    trip = None
+    try:
+        trip_id = PydanticObjectId(request.trip_id)
+    except (ValueError, InvalidId):
+        pass
+    else:
+        trip = await Trip.get(trip_id)
+
     if not trip:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Trip {request.trip_id} not found"
-        )
+        raise HTTPException(status_code=404, detail="Trip not found")
 
     # Update trip status to completed
     trip.status = TripStatusCode.TRIP_COMPLETED
