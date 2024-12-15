@@ -619,6 +619,17 @@ async def force_trip_complete_by_external(
             req_body=request.model_dump(by_alias=True),
         )
 
+    # Check if trip can be completed
+    if trip.status in [TripStatusCode.CANCELLED, TripStatusCode.TRIP_COMPLETED]:
+        raise YummyHTTPException(
+            status_code=400,
+            name="ValidationError",
+            path="/api/v1/payment-trip/pay-payment-b2b",
+            method="POST",
+            message="Trip cannot be completed in its current state",
+            req_body=request.model_dump(by_alias=True),
+        )
+
     # Update trip status to completed
     trip.status = TripStatusCode.TRIP_COMPLETED
     await trip.save()
