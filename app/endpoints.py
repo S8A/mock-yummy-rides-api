@@ -465,6 +465,21 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
 async def force_trip_complete_by_external(
     request: ForceTripCompleteRequest
 ) -> ForceTripCompleteResponse:
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(request.trip_id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {request.trip_id} not found"
+        )
+
+    # Update trip status to completed
+    trip.status = TripStatusCode.TRIP_COMPLETED
+    await trip.save()
+
     return ForceTripCompleteResponse(
         status=200,
         response=ForceTripCompleteResponseData(
