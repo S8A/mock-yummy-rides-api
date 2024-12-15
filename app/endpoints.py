@@ -350,7 +350,7 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             name="NotFoundError",
             path="/api/v1/trip/api-corporate",
             method="POST",
-            message="Quotation not found",
+            message="No se encontró la cotización",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -366,7 +366,7 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             name="ValidationError",
             path="/api/v1/trip/api-corporate",
             method="POST",
-            message="Quotation already used to create a trip",
+            message="La cotización ya fue utilizada para crear un viaje",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -385,7 +385,7 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             name="NotFoundError",
             path="/api/v1/trip/api-corporate",
             method="POST",
-            message="Service type not found",
+            message="No se encontró el tipo de servicio",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -398,7 +398,7 @@ async def create_trip(request: CreateTripRequest) -> CreateTripResponse:
             name="ValidationError",
             path="/api/v1/trip/api-corporate",
             method="POST",
-            message="Service type not available for this quotation",
+            message="El tipo de servicio no está disponible para esta cotización",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -515,7 +515,7 @@ async def get_trip_status(id: str) -> GetStatusTripResponse:
             name="NotFoundError",
             path=f"/api/v1/trip/api-status-by-corporate/{id}",
             method="GET",
-            message="Trip not found",
+            message="No se encontró el viaje",
         )
 
     # Generate deterministic unique_id using the trip's ID
@@ -558,7 +558,7 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
             name="NotFoundError",
             path="/api/v1/trip/external-cancel-trip",
             method="POST",
-            message="Trip not found",
+            message="No se encontró el viaje",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -573,7 +573,7 @@ async def cancel_trip_by_external(request: CancelTripRequest) -> CancelTripRespo
             name="ValidationError",
             path="/api/v1/trip/external-cancel-trip",
             method="POST",
-            message="Trip cannot be cancelled in its current state",
+            message="No se puede cancelar el viaje en su estado actual",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -615,7 +615,7 @@ async def force_trip_complete_by_external(
             name="NotFoundError",
             path="/api/v1/payment-trip/pay-payment-b2b",
             method="POST",
-            message="Trip not found",
+            message="No se encontró el viaje",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -626,7 +626,7 @@ async def force_trip_complete_by_external(
             name="ValidationError",
             path="/api/v1/payment-trip/pay-payment-b2b",
             method="POST",
-            message="Trip cannot be completed in its current state",
+            message="No se puede completar el viaje en su estado actual",
             req_body=request.model_dump(by_alias=True),
         )
 
@@ -637,7 +637,10 @@ async def force_trip_complete_by_external(
             name="ValidationError",
             path="/api/v1/payment-trip/pay-payment-b2b",
             method="POST",
-            message="forceB2B must be true to force trip completion",
+            message=(
+                "El campo forceB2B debe ser verdadero para forzar la "
+                "finalización del viaje"
+            ),
             req_body=request.model_dump(by_alias=True),
         )
 
