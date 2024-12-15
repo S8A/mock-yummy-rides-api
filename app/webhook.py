@@ -1,11 +1,14 @@
 from enum import Enum
 import logging
+import random
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import httpx
+from beanie import PydanticObjectId
 
 from config import settings
+from db import Contact, Trip, init_db
 from dependencies import api_key_header
 from endpoints import TripStatusCode
 
@@ -42,11 +45,31 @@ class Person(BaseModel):
     last_name: str
     phone: str
 
+    @classmethod
+    def from_contact(cls, contact: Contact) -> "Person":
+        phone = ""
+        if contact.phone_country_code and contact.phone_number:
+            phone = f"{contact.phone_country_code}{contact.phone_number}"
+
+        return cls(
+            first_name=contact.first_name,
+            last_name=contact.last_name,
+            phone=phone,
+        )
+
 
 class Driver(Person):
     id: str
     unique_id: int
     location: tuple[float, float] | None = None
+
+    @classmethod
+    def from_contact(cls, id: str, unique_id: int, contact: Contact) -> "Driver":
+        return cls(
+            id=id,
+            unique_id=unique_id,
+            **Person.from_contact(contact).model_dump(),
+        )
 
 
 class TripData(BaseModel):
@@ -93,27 +116,60 @@ async def send_webhook(payload: WebhookPayload) -> httpx.Response:
         return response
 
 
-@router.post("/trip/{trip_id}/status")
+@router.post("/trip/{trip_id}/status", response_model_exclude_unset=True)
 async def update_trip_status(
     trip_id: str,
     status_code: TripStatusCode,
 ) -> WebhookCallResponse:
     """Send trip status update webhook"""
-    mock_trip_data = TripData(
-        id=trip_id,
-        unique_id=123,
-        code=status_code,
-        sender=Person(
-            first_name="John",
-            last_name="Doe",
-            phone="+584141234567",
-        ),
+    # Initialize database connection
+    await init_db()
+
+    # Try to get the trip
+    trip = await Trip.get(PydanticObjectId(trip_id))
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Trip {trip_id} not found"
+        )
+
+    # Update trip status
+    trip.status = status_code
+    await trip.save()
+
+    # Generate deterministic unique_id using the trip's ID
+    random.seed(str(trip.id))
+    unique_id = random.randint(10000, 99999)
+
+    # Convert Contact objects to Person objects
+    sender = Person.from_contact(trip.sender)
+
+    receiver = None
+    if trip.receiver:
+        receiver = Person.from_contact(trip.receiver)
+
+    driver = None
+    if trip.driver:
+        driver = Driver.from_contact(str(trip.id), unique_id, trip.driver)
+
+    # Create TripData from actual trip
+    trip_data = TripData(
+        id=str(trip.id),
+        unique_id=unique_id,
+        code=trip.status,
+        order_id=trip.order_id,
+        sender=sender,
+        receiver=receiver,
+        driver=driver,
     )
+
+    # Build and send payload to webhook
     payload = WebhookPayload(
         type=WebhookType.TRIP_UPDATE,
-        data=mock_trip_data
+        data=trip_data,
     )
     await send_webhook(payload)
+
     return WebhookCallResponse(
         success=True,
         message="Webhook sent successfully"
