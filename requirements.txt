@@ -4,3 +4,4 @@ pydantic
 pydantic-settings
 beanie
 motor
+haversine
