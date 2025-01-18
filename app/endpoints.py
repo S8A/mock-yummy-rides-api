@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
+from haversine import haversine, Unit
 
 from db import (
     Contact,
@@ -23,7 +24,7 @@ from db import (
     init_db,
 )
 from dependencies import api_key_header, get_language_header
-from utils import calculate_distance_between_coordinates, generate_driver_data
+from utils import generate_driver_data
 
 router = APIRouter(
     prefix="/api/v1",
@@ -267,9 +268,10 @@ async def create_quotation(request: CreateQuotationRequest) -> CreateQuotationRe
     await init_db()
 
     # Calculate distance between coordinates
-    distance = calculate_distance_between_coordinates(
+    distance = haversine(
         (request.pickup_latitude, request.pickup_longitude),
-        (request.destination_latitude, request.destination_longitude)
+        (request.destination_latitude, request.destination_longitude),
+        unit=Unit.KILOMETERS,
     )
 
     # Calculate the ETA in seconds based on the distance and assuming 60 km/h
